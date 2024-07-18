@@ -4,6 +4,7 @@
 #include "MovingAverage.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "Adafruit_NeoPixel.h"
 
 enum IMU_DEBUG_STATUS {
     IMU_DEBUG_STATUS_NONE = 0,
@@ -31,6 +32,8 @@ public:
     void setVerticalThresholds(float x_lower, float x_upper, float y_lower, float y_upper);
     void setLoopDelay(uint32_t delay_ms);
     void setSampleSize(uint16_t samples);
+
+    Adafruit_NeoPixel ring;
 
     void setTiltedCallback(IMUEventCallback callback);
     void setLevelCallback(IMUEventCallback callback);

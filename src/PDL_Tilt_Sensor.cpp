@@ -3,12 +3,13 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "math.h"
+#include "Adafruit_NeoPixel.h"
 
 #define DEFAULT_VERTICAL_THRESHOLD_DEGREES 10
 #define DEFAULT_TASK_PRIORITY 2
 #define DEFAULT_LOOP_DELAY_MS 100
 #define TASK_STACK_SIZE 1024
-#define DEFAULT_ANGLE_X_OFFSET 90
+#define DEFAULT_ANGLE_X_OFFSET 45
 #define DEFAULT_ANGLE_Y_OFFSET 90
 
 PDL_Tilt_Sensor::PDL_Tilt_Sensor()
@@ -20,6 +21,7 @@ PDL_Tilt_Sensor::PDL_Tilt_Sensor()
       is_vertical(false), was_vertical(false),
       loop_delay(DEFAULT_LOOP_DELAY_MS), debug_status(IMU_DEBUG_STATUS_NONE),
       ax_offset(DEFAULT_ANGLE_X_OFFSET), ay_offset(DEFAULT_ANGLE_Y_OFFSET), imu_task_handle(NULL),
+      ring(12, D10, NEO_GRB + NEO_KHZ800),
       tilted_callback(nullptr), level_callback(nullptr) {}
 
 void PDL_Tilt_Sensor::init(uint32_t priority)
@@ -34,6 +36,10 @@ void PDL_Tilt_Sensor::init(uint32_t priority)
     }
 
     xTaskCreate(imuTask, "IMU_TASK", TASK_STACK_SIZE, this, priority, &imu_task_handle);
+
+    ring.begin();
+    ring.setBrightness(100);
+    ring.show();
 }
 
 void PDL_Tilt_Sensor::deinit()
@@ -82,10 +88,52 @@ void PDL_Tilt_Sensor::processIMUData()
     float ay = ay_filter.add(ay_raw);
     float az = az_filter.add(az_raw);
 
-    angle_x = atan2(sqrt(ay * ay + az * az), ax) * 180 / M_PI - ax_offset;
+    angle_x = -(atan2(sqrt(ay * ay + az * az), ax) * 180 / M_PI - ax_offset);
     angle_y = atan2(sqrt(ax * ax + az * az), ay) * 180 / M_PI - ay_offset;
 
     checkTiltStatus();
+
+
+    // float delta_x = 0, delta_y = 0;
+    // if (angle_x < x_lower_threshold || angle_x > x_upper_threshold) {
+    //     delta_x = angle_x;
+    // }
+    // if (angle_y < y_lower_threshold || angle_y > y_upper_threshold) {
+    //     delta_y = angle_y;
+    // }
+
+
+
+    int angle_step = 30;
+    float theta = atan2(-angle_y,angle_x) * 180 / M_PI;
+
+    int theta_LED = (int) theta / angle_step;
+    if (theta_LED < 0) {
+        theta_LED = 12 + theta_LED;
+    }
+
+    if (is_vertical) {
+        for (int i = 0; i < 12; i++)
+        {
+            ring.setPixelColor(i, ring.Color(0, 255, 0));
+        }
+    }
+    else {
+        for (int i = 0; i < 12; i++)
+        {
+            if (i == theta_LED) {
+            ring.setPixelColor(i, ring.Color(255, 255, 0));
+            }
+            else {
+            ring.setPixelColor(i, ring.Color(0, 0, 0));
+            }
+            
+        }
+    }
+
+    ring.show();
+
+
 
     switch (debug_status)
     {
@@ -96,7 +144,7 @@ void PDL_Tilt_Sensor::processIMUData()
         Serial.printf("ax:%6d, ay:%6d, az:%6d\n", ax, ay, az);
         break;
     case IMU_DEBUG_STATUS_ANGLE:
-        Serial.printf("angle_x:%6.3f, angle_y:%6.3f, is_vertical:%d\n", angle_x, angle_y, is_vertical);
+        Serial.printf("angle_x:%6.3f, angle_y:%6.3f, is_vertical:%d, theta:%6.3f, theta_LED:%d\n", angle_x, angle_y, is_vertical, theta, theta_LED);
         break;
     case IMU_DEBUG_THRESHOLD:
         Serial.printf("angle_x:%6.3f, angle_y:%6.3f, is_vertical:%d\n", angle_x, angle_y, is_vertical);
@@ -181,3 +229,9 @@ void PDL_Tilt_Sensor::checkTiltStatus()
         }
     }
 }
+
+// void PDL_Tilt_Sensor::updateLED()
+// {
+
+
+// }
